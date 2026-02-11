@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Photo de profil – Auchel</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  background: #f4f4f4;
+  padding: 20px;
+}
+canvas {
+  max-width: 100%;
+  background: white;
+  border-radius: 10px;
+  touch-action: none;
+  cursor: grab;
+}
+button {
+  margin: 5px;
+  padding: 10px 16px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.hint {
+  font-size: 14px;
+  color: #555;
+  margin-top: 10px;
+}
+#resultImg {
+  margin-top: 20px;
+  max-width: 90%;
+  border-radius: 10px;
+  display: none;
+}
+#iosHint {
+  font-size: 13px;
+  color: #d33;
+  margin-top: 8px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Ajoutez et ajustez votre photo</h2>
+
+<input type="file" id="upload" accept="image/*"><br><br>
+
+<canvas id="canvas" width="1200" height="1200"></canvas><br>
+
+<div class="hint">
+👉 Glissez la photo pour centrer votre visage. Zoom optionnel si nécessaire.
+</div>
+
+<button id="zoomIn">+</button>
+<button id="zoomOut">–</button>
+<button id="generate">Générer ma photo</button>
+<button id="saveBtn" style="display:none;">Enregistrer dans Photos</button>
+
+<div id="iosHint" style="display:none;">
+<i>iPhone/iPad : appuyez longuement sur l'image générée et sélectionnez “Ajouter aux Photos”</i>
+</div>
+
+<img id="resultImg" alt="Photo générée">
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const frame = new Image();
+frame.src = "cadre.png"; // Nom exact du cadre Canva
+
+let img = null;
+let imgX = 600;
+let imgY = 600;
+let zoom = 1.0;
+
+// Masque elliptique : largeur et hauteur légèrement différentes pour correspondre au cadre
+const ellipseRadiusX = 540; // moitié largeur visible du cadre
+const ellipseRadiusY = 500; // moitié hauteur visible du cadre
+
+let dragging = false;
+let startX, startY;
+
+frame.onload = draw;
+
+document.getElementById("upload").addEventListener("change", function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    img = new Image();
+    img.onload = () => {
+      // Centrer automatiquement
+      imgX = 600;
+      imgY = 600;
+      draw();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+// Drag souris
+canvas.addEventListener("mousedown", e=>{
+  dragging = true;
+  startX = e.offsetX;
+  startY = e.offsetY;
+});
+canvas.addEventListener("mouseup", ()=>dragging=false);
+canvas.addEventListener("mouseleave", ()=>dragging=false);
+canvas.addEventListener("mousemove", e=>{
+  if(!dragging) return;
+  imgX += e.offsetX - startX;
+  imgY += e.offsetY - startY;
+  startX = e.offsetX;
+  startY = e.offsetY;
+  draw();
+});
+
+// Drag tactile
+canvas.addEventListener("touchstart", e=>{
+  dragging = true;
+  const t = e.touches[0];
+  startX = t.clientX;
+  startY = t.clientY;
+});
+canvas.addEventListener("touchend", ()=>dragging=false);
+canvas.addEventListener("touchmove", e=>{
+  if(!dragging) return;
+  const t = e.touches[0];
+  imgX += t.clientX - startX;
+  imgY += t.clientY - startY;
+  startX = t.clientX;
+  startY = t.clientY;
+  draw();
+});
+
+// Zoom boutons
+document.getElementById("zoomIn").addEventListener("click", ()=>{ zoom *= 1.05; draw(); });
+document.getElementById("zoomOut").addEventListener("click", ()=>{ zoom /= 1.05; draw(); });
+
+// Générer photo
+document.getElementById("generate").addEventListener("click", ()=>{
+  draw();
+  const dataURL = canvas.toDataURL("image/png");
+  const resultImg = document.getElementById("resultImg");
+  resultImg.src = dataURL;
+  resultImg.style.display = "block";
+
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const saveBtn = document.getElementById("saveBtn");
+  const iosHint = document.getElementById("iosHint");
+
+  saveBtn.style.display = "inline-block";
+  iosHint.style.display = isIOS ? "block" : "none";
+});
+
+// Enregistrer dans Photos
+document.getElementById("saveBtn").addEventListener("click", ()=>{
+  const resultImg = document.getElementById("resultImg");
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  if(isIOS){
+    // iOS : ouvre l'image → appui long → Ajouter aux Photos
+    window.open(resultImg.src, "_blank");
+  } else {
+    const link = document.createElement("a");
+    link.href = resultImg.src;
+    link.download = "photo-profil-auchel.png";
+    link.click();
+  }
+});
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(img){
+    const size = Math.max(img.width,img.height);
+    const drawSize = Math.max(ellipseRadiusX*2, ellipseRadiusY*2) * zoom;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(600, 600, ellipseRadiusX, ellipseRadiusY, 0, 0, Math.PI*2);
+    ctx.clip();
+
+    ctx.drawImage(
+      img,
+      (img.width-size)/2,
+      (img.height-size)/2,
+      size,
+      size,
+      imgX - drawSize/2,
+      imgY - drawSize/2,
+      drawSize,
+      drawSize
+    );
+
+    ctx.restore();
+  }
+  // Cadre au-dessus
+  ctx.drawImage(frame,0,0,1200,1200);
+}
+</script>
+
+</body>
+</html>
